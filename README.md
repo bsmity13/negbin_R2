@@ -1,1 +1,1 @@
-# Negative Binomial GLM Pseudo-R^2^
+# Negative Binomial GLM Pseudo-R<sup>2</sup>
