@@ -206,3 +206,6 @@ suppressWarnings({
 We can see that the Poisson model has a "high" pseudo-R^2^ of about `r round(r2_1, 2)`. Most users would be relatively happy with this metric. The moderately overdispersed negative binomial (NB1) has a much lower pseudo-R^2^ of just `r round(r2_2, 2)`. Most users would likely still accept this value, but they might be tempted to look for missing covariates (even though our model is perfectly specified). The strongly overdispersed negative binomial (NB2) is the most concerning. It has pseudo-R^2^ of just `r round(r2_3, 2)`, even though the model was specified exactly correctly and the model estimated the parameters with good accuracy and precision.
 
 ---
+
+This page was created in RMarkdown and is hosted on GitHub. See the source code in the GitHub repository here:
+https://github.com/bsmity13/negbin_R2
