@@ -582,7 +582,19 @@ overdispersed negative binomial (NB2) is the most concerning. It has
 pseudo-R<sup>2</sup> of just 0.04, even though the model was specified
 exactly correctly and the model estimated the parameters with good
 accuracy and precision.</p>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>Even for a correctly specified and well estimated model, a negative
+binomial GLM will still have a low pseudo-R<sup>2</sup>. Accounting for
+overdispersion is important for accurately estimating parameters and
+avoiding overfitting. If the negative binomial model is justifiable from
+first principles, you may not want to put too much weight behind a low
+pseudo-R<sup>2</sup>. After all, you asked the model to have
+overdispersion when you chose the NB over the Poisson.</p>
 <hr />
+<p>This page was created in RMarkdown and is hosted on GitHub. See the
+source code in the GitHub repository here: <a href="https://github.com/bsmity13/negbin_R2" class="uri">https://github.com/bsmity13/negbin_R2</a></p>
 </div>
 
 
