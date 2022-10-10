@@ -1,0 +1,208 @@
+---
+title: "Negative Binomial GLM Pseudo-R<sup>2</sup>"
+author: "Brian J. Smith"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Pseudo-R^2^ metrics for GLMs are analogous to ordinary R^2^ for a linear regression model. As such, they are typically used as a measure of goodness-of-fit, with many users implicitly assuming that a low pseudo-R^2^ corresponds to missing covariates and a poorly calibrated model.
+
+The purpose of this document is to demonstrate via simulation a negative binomial GLM with high dispersion will have a low pseudo-R^2^, even if the model structure is 100% correct and the parameters are estimated well.
+
+## Load packages
+
+We will use the `MASS` package to fit the negative binomial GLM and the `MuMIn` package to calculate the pseudo-R^2^. We will use `ggplot2` to visualize the results
+
+```{r load packages}
+library(MASS)
+library(MuMIn)
+library(ggplot2)
+```
+
+## Simulate data
+
+We will simulate data under a very simple model. We'll have just a single covariate, such that the linear predictor is just an intercept and a single slope, and we'll use the natural logarithm as the link function.
+
+$$log(\mu_i) = \beta_0 + \beta_1 x_{1, i}$$
+
+### Model parameters
+
+Here are the true intercept and slope:
+
+```{r betas}
+b0 <- 0.5
+b1 <- -1
+```
+
+And some random values of $x_1$:
+
+```{r x1}
+set.seed(123456)
+x1 <- rnorm(n = 1000, mean = 0, sd = 1)
+```
+
+Now we construct the linear predictor.
+
+```{r lp}
+# Link scale
+log_mu <- b0 + b1 * x1
+
+# Natural scale
+mu <- exp(log_mu)
+```
+
+### Simulate response data
+
+We'll simulate three data sets with the same linear predictor:
+
+1. using the Poisson (no overdispersion),
+2. using the negative binomial (moderate overdispersion),
+3. using the negative binomial (strong overdispersion).
+
+The negative binomial is parameterized in terms of a size ($r$) and probability ($p$) parameter. In order to use it as an overdispersed Poisson, we can fix $r$ (smaller $r$ means greater dispersion) and then calculate $p$ as:
+
+$$p_i = \frac{r}{r + \mu_i}$$
+
+Note that $p_i$ and $\mu_i$ have an observation-level subscript ($i$), but $r$ does not.
+
+The variance around the expected value ($\mu_i$) for the negative binomial is then:
+
+$$\sigma^2_i = \frac{(1-p_i)r}{p_i^2}$$
+
+```{r simulate}
+# 1. Poisson
+y_pois <- rpois(n = length(mu), lambda = mu)
+
+# 2. Negative binomial (moderate overdispersion)
+r1 <- 0.5
+p1 <- r1/(r1 + mu)
+y_nb1 <- rnbinom(n = length(mu), size = r1, prob = p1)
+
+# 3. Negative binomial (strong overdispersion)
+r2 <- 0.05
+p2 <- r2/(r2 + mu)
+y_nb2 <- rnbinom(n = length(mu), size = r2, prob = p2)
+```
+
+We can take a quick look at histograms of our results. Remember that the expected value is the same for all observations in all 3 datasets.
+
+```{r hist}
+# Combine datasets
+y <- rbind(
+  data.frame(which = "Poisson", y = y_pois),
+  data.frame(which = "NB1", y = y_nb1),
+  data.frame(which = "NB2", y = y_nb2)
+)
+# Factor 'which' with desired plotting order
+y$which <- factor(y$which, levels = c("Poisson", "NB1", "NB2"))
+
+# Plot
+ggplot(y, aes(x = y)) +
+  facet_wrap(~ which) +
+  geom_histogram(bins = 50) +
+  theme_bw()
+```
+
+You can see that as we increase the variance from left to right, we both increase the number of 0s and the number of large values.
+
+## Fit models
+
+Now we will fit the appropriate model to each of our simulated datasets.
+
+```{r fit glm}
+# 1. Poisson
+m1 <- glm(y_pois ~ x1, family = poisson())
+
+# 2. Negative binomial (moderate overdispersion)
+m2 <- glm.nb(y_nb1 ~ x1)
+
+# 3. Negative binomial (strong overdispersion)
+m3 <- glm.nb(y_nb2 ~ x1)
+```
+
+## Compare model fit
+
+Let's demonstrate that we were able to estimate the parameters well in each model.
+
+```{r beta fit}
+# 1. Poisson
+betas1 <- coef(m1)
+ci1 <- confint(m1)
+
+# 2. Negative binomial (moderate overdispersion)
+betas2 <- coef(m2)
+ci2 <- confint(m2)
+
+# 3. Negative binomial (strong overdispersion)
+betas3 <- coef(m3)
+ci3 <- confint(m3)
+
+# Combine
+beta_data <- rbind(
+  data.frame(which = "Poisson",
+             parm = c("beta[0]", "beta[1]"),
+             lwr = ci1[, 1],
+             est = betas1,
+             upr = ci1[, 2],
+             true = c(b0, b1)),
+  data.frame(which = "NB1",
+             parm = c("beta[0]", "beta[1]"),
+             lwr = ci2[, 1],
+             est = betas2,
+             upr = ci2[, 2],
+             true = c(b0, b1)),
+  data.frame(which = "NB2",
+             parm = c("beta[0]", "beta[1]"),
+             lwr = ci3[, 1],
+             est = betas3,
+             upr = ci3[, 2],
+             true = c(b0, b1))
+)
+# Factor 'which' with desired plotting order
+beta_data$which <- factor(beta_data$which, levels = c("Poisson", "NB1", "NB2"))
+
+# Plot
+ggplot(beta_data, aes(x = which, y = est, ymin = lwr, ymax = upr, grup = which)) +
+  facet_wrap(~ parm, scales = "free_y") +
+  geom_errorbar(width = 0.1) +
+  geom_hline(aes(yintercept = true, color = factor(true))) +
+  geom_point() +
+  xlab("Model") +
+  ylab("Estimate") +
+  scale_color_manual(name = "True Value", breaks = c(b0, b1), 
+                     labels = c("beta[0]", "beta[1]"),
+                     values = c("orange", "blue")) +
+  theme_bw()
+```
+
+We can see that all 3 models estimated both $\beta_0$ and $\beta_1$ with enough precision and accuracy that the true values (horizontal lines) are always captured within the 95% confidence interval.
+
+## Compare pseudo-R^2^
+
+Our models have performed well, recovering the true parameter values in each case. How do their pseudo-R^2^s compare?
+
+```{r pR2}
+# Calculate pseudo-R^2
+suppressWarnings({
+  r2_1 <- r.squaredGLMM(m1)[1, 1]
+  r2_2 <- r.squaredGLMM(m2)[1, 1]
+  r2_3 <- r.squaredGLMM(m3)[1, 1]
+})
+
+```
+
+| Model   | Pseudo-R^2^        |
+|:-------:|:------------------:|
+| Poisson | `r round(r2_1, 3)` |
+| NB1     | `r round(r2_2, 3)` |
+| NB2     | `r round(r2_3, 3)` |
+
+We can see that the Poisson model has a "high" pseudo-R^2^ of about `r round(r2_1, 2)`. Most users would be relatively happy with this metric. The moderately overdispersed negative binomial (NB1) has a much lower pseudo-R^2^ of just `r round(r2_2, 2)`. Most users would likely still accept this value, but they might be tempted to look for missing covariates (even though our model is perfectly specified). The strongly overdispersed negative binomial (NB2) is the most concerning. It has pseudo-R^2^ of just `r round(r2_3, 2)`, even though the model was specified exactly correctly and the model estimated the parameters with good accuracy and precision.
+
+---
