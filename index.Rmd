@@ -2,7 +2,10 @@
 title: "Negative Binomial GLM Pseudo-R<sup>2</sup>"
 author: "Brian J. Smith"
 date: "`r Sys.Date()`"
-output: html_document
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
 ---
 
 ```{r setup, include=FALSE}
